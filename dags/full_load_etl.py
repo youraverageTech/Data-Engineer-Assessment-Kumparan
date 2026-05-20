@@ -5,6 +5,10 @@ from airflow.providers.snowflake.hooks.snowflake import SnowflakeHook
 from datetime import datetime, timedelta
 import os
 import pandas as pd
+import logging
+
+# Inisialisasi logger untuk Airflow task
+logger = logging.getLogger("airflow.task")
 
 """
 DAG ini digunakan untuk melakukan full load data dari database source PostgreSQL ke Snowflake. 
@@ -24,6 +28,7 @@ default_args = {
 
 ## Ekstraksi Data dari database source PostgreSQL
 def extract_data():
+    logger.info("Memulai proses ekstraksi data dari PostgreSQL...")
     ### membuat koneksi hook ke database PostgreSQL
     pg_hook = PostgresHook(postgres_conn_id="postgres_source")
 
@@ -32,26 +37,31 @@ def extract_data():
     df_authors = pg_hook.get_pandas_df(author_data)
     author_path_file = "/tmp/authors.csv"
     df_authors.to_csv(author_path_file, index=False)
+    logger.info(f"Berhasil mengekstrak data dari tabel authors. Total baris: {len(df_authors)}")
 
     ### query untuk mengambil data dari tabel articles dan menyimpannya ke dalam file CSV
     articles_data = "Select * from articles"
     df_articles = pg_hook.get_pandas_df(articles_data)
     articles_path_file = "/tmp/articles.csv"
     df_articles.to_csv(articles_path_file, index=False)
+    logger.info(f"Berhasil mengekstrak data dari tabel articles. Total baris: {len(df_articles)}")
 
 ## Load data ke Snowflake staging tables
 def load_data_to_staging():
+    logger.info("Memulai proses memuat data ke Snowflake staging tables...")
     ### membuat koneksi hook ke Snowflake
     sf_hook = SnowflakeHook(snowflake_conn_id="snowflake_target")
 
     ### truncate staging tables sebelum melakukan load data
     sf_hook.run("TRUNCATE TABLE staging.authors")
     sf_hook.run("TRUNCATE TABLE staging.articles")
+    logger.info("Staging tables (authors dan articles) berhasil di-truncate.")
 
     ### Load data dari file csv ke staging tables snowflake
     #### melakukan load data authors ke staging_authors
     author_path_file = "/tmp/authors.csv"
     if os.path.exists(author_path_file):
+        logger.info("Mengunggah dan menyalin data authors ke staging...")
         sf_hook.run(f'PUT file://{author_path_file} @~ OVERWRITE = TRUE;')
         sf_hook.run("""
             COPY INTO staging.authors
@@ -61,7 +71,7 @@ def load_data_to_staging():
         """)
 
         count_authors = sf_hook.get_first("select count(*) from staging.authors")[0]
-        print(f"Jumlah data yang berhasil di load ke staging_authors : {count_authors} rows")
+        logger.info(f"Jumlah data yang berhasil di-load ke staging_authors: {count_authors} rows")
 
     else:
         raise FileNotFoundError("File CSV tidak ditemukan di path yang ditentukan.")
@@ -69,6 +79,7 @@ def load_data_to_staging():
     #### melakukan load data articles ke staging_articles
     articles_path_file = "/tmp/articles.csv"
     if os.path.exists(articles_path_file):
+        logger.info("Mengunggah dan menyalin data articles ke staging...")
         sf_hook.run(f'PUT file://{articles_path_file} @~ OVERWRITE = TRUE;')
         sf_hook.run("""
             COPY INTO staging.articles
@@ -77,12 +88,13 @@ def load_data_to_staging():
             PURGE = TRUE;
         """)
         count_articles = sf_hook.get_first("select count(*) from staging.articles")[0]
-        print(f"Jumlah data yang berhasil di load ke staging_articles : {count_articles} rows")
+        logger.info(f"Jumlah data yang berhasil di-load ke staging_articles: {count_articles} rows")
     else:
         raise FileNotFoundError("File CSV tidak ditemukan di path yang ditentukan.")
 
 ## Transformasi data dan load ke Snowflake target tables
 def merge_data_to_target():
+    logger.info("Memulai proses transformasi dan load data ke Snowflake target tables...")
     ### membuat koneksi hook ke Snowflake
     sf_hook = SnowflakeHook(snowflake_conn_id="snowflake_target")
 
@@ -90,11 +102,13 @@ def merge_data_to_target():
     sf_hook.run("TRUNCATE TABLE dwh.dim_authors")
     sf_hook.run("TRUNCATE TABLE dwh.dim_articles")
     sf_hook.run("TRUNCATE TABLE dwh.fact_reports_articles")
+    logger.info("Target tables (dim_authors, dim_articles, fact_reports_articles) berhasil di-truncate.")
 
     ### melakukan merge data dari staging tables ke target tables
     #### melakukan merge data dari staging_authors ke dim_authors
+    logger.info("Memasukkan data dari staging ke dwh.dim_authors...")
     sf_hook.run("""
-        INSERT INTO dwh.dim_authors (authors_id, name, email, created_at, updated_at) as 
+        INSERT INTO dwh.dim_authors (authors_id, name, email, created_at, updated_at)
         SELECT id as authors_id
                 , name
                 , email
@@ -102,33 +116,43 @@ def merge_data_to_target():
                 , updated_at
         FROM staging.authors
     """)
+    count_dim_authors = sf_hook.get_first("select count(*) from dwh.dim_authors")[0]
+    logger.info(f"Jumlah data yang berhasil disimpan di dwh.dim_authors: {count_dim_authors} rows")
 
     #### melakukan merge data dari staging_articles ke dim_articles
+    logger.info("Memasukkan data dari staging ke dwh.dim_articles...")
     sf_hook.run("""
-        INSERT INTO dwh.dim_articles (articles_id, title, content, published_at, created_at, updated_at) as 
+        INSERT INTO dwh.dim_articles (articles_id, title, content, published_at, created_at, updated_at, deleted_at)
         SELECT id as articles_id
                 , title
                 , content
                 , published_at
                 , created_at
                 , updated_at
+                , deleted_at
         FROM staging.articles;
     """)
+    count_dim_articles = sf_hook.get_first("select count(*) from dwh.dim_articles")[0]
+    logger.info(f"Jumlah data yang berhasil disimpan di dwh.dim_articles: {count_dim_articles} rows")
 
     #### melakukan merge data ke fact_reports_articles
+    logger.info("Memasukkan data ke dwh.fact_reports_articles...")
     sf_hook.run("""
-        INSERT INTO dwh.fact_reports_articles (article_id, author_id, published_date_at, article_count) as
-        SELECT a.articles_id
+        INSERT INTO dwh.fact_reports_articles (article_id, author_id, published_date_at, article_count)
+        SELECT a.id as article_id
                 , au.authors_id
-                , a.published_at as published_date_at
+                , TO_NUMBER(TO_CHAR(a.published_at, 'YYYYMMDD')) as published_date_at
                 , count(a.id) as article_count
-        from dwh.dim_articles a
+        from staging.articles a
         JOIN dwh.dim_authors au
-        ON a.articles_id = au.authors_id
-        GROUP BY a.articles_id, au.authors_id, a.published_at;
+        ON a.author_id = au.authors_id
+        WHERE a.published_at IS NOT NULL
+        GROUP BY a.id, au.authors_id, a.published_at;
     """)
+    count_fact_articles = sf_hook.get_first("select count(*) from dwh.fact_reports_articles")[0]
+    logger.info(f"Jumlah data yang berhasil disimpan di dwh.fact_reports_articles: {count_fact_articles} rows")
 
-## Membuat DAG untuk full load data dari database source PostgreSQL ke Snowflake
+# Membuat DAG untuk full load data dari database source PostgreSQL ke Snowflake
 with DAG(
     "full_load_etl",
     default_args=default_args,
@@ -160,4 +184,3 @@ with DAG(
 
     ### Menentukan urutan eksekusi task
     extract_task >> load_staging_task >> merge_target_task
-
