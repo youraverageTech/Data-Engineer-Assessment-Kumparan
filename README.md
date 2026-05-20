@@ -197,11 +197,16 @@ Jawaban: Menurut saya untuk solusi tersebut bisa menggunakan cara pertama melaku
 
 ### Snowflake database target
 
+#### Incremental load
+
 ![alt text](image-4.png)
 
 ![alt text](image-5.png)
 
 ![alt text](image-6.png)
 
+#### Full load
 
+![alt text](image-7.png)
 
+![alt text](image-8.png)
