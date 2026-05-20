@@ -96,7 +96,7 @@ extract_data_from_postgres >> load_data_to_staging >> [load_dim_authors, load_di
 
 #### 3. `incremental_load_etl` — Incremental Load
 
-DAG ini melakukan **incremental load** menggunakan strategi delta berdasarkan kolom `updated_at`. Hanya data yang baru atau berubah yang diproses, menggunakan perintah **MERGE (Upsert)** di Snowflake.
+DAG ini melakukan **incremental load** menggunakan strategi delta berdasarkan kolom `updated_at`. Hanya data yang baru atau berubah yang diproses, menggunakan perintah **MERGE (Upsert)** di Snowflake. Schedule yang digunakan yaitu perjam/hourly.
 
 ```
 extract_incremental_data >> load_incremental_to_staging >> [merge_dim_authors, merge_dim_articles] >> merge_fact_report_articles
@@ -168,3 +168,40 @@ apache-airflow-providers-snowflake
 apache-airflow-providers-postgres
 pandas
 ```
+
+## Bonus
+
+### Data Warehouse Schema
+
+![alt text](image.png)
+
+## Pertanyaan
+
+`The ETL/ELT that you made is new, and the data that is in the database is from 2016. What should you consider?`
+Jawaban: Menurut saya, perlu mengetahui terlebih dahulu apakah data lama yang dari tahun 2016 masih berguna atau tidak. jika masih berguna, bisa menggunakan cara full load untuk memproses data tersebut. dikarenakan untuk melakukan full load dengan data dari tahun yang sudah lama akan memakan resource yang banyak, maka bisa menggunakan cara chuncking atau menggunakan spark untuk computasinya dan perlu resource server yang besar juga.
+
+`What if the table design is using "hard delete" method. That means once the data is deleted, the row is also get deleted. So the data in the data warehouse and in the database should sync`
+Jawaban: Menurut saya untuk solusi tersebut bisa menggunakan cara pertama melakukan comparasi kolom primary key dari table source dan target, dengan menghapus data pada table target. Kedua, bisa menggunakan cara CDC (Change Data Capture). Dan terakhir, bisa menggunakan full load secara berkala.
+
+## Dokumentasi
+
+### PostgreSQL database source
+
+![alt text](image-1.png)
+
+### Airflow UI dags
+
+![alt text](image-2.png)
+
+![alt text](image-3.png)
+
+### Snowflake database target
+
+![alt text](image-4.png)
+
+![alt text](image-5.png)
+
+![alt text](image-6.png)
+
+
+
