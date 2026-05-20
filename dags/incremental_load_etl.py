@@ -205,7 +205,6 @@ with DAG(
     extract_task = PythonOperator(
         task_id='extract_incremental_data',
         python_callable=extract_incremental_data,
-        provide_context=True,
         execution_timeout=timedelta(minutes=3),
     )
 

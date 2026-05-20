@@ -1,6 +1,5 @@
 from airflow import DAG
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
-from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from datetime import datetime, timedelta
 import os
 
@@ -44,9 +43,9 @@ with DAG(
     )
 
     # Task untuk menjalankan target_table_creation.sql pada Snowflake
-    setup_target = SnowflakeOperator(
+    setup_target = SQLExecuteQueryOperator(
         task_id='setup_target_snowflake',
-        snowflake_conn_id='snowflake_target',
+        conn_id='snowflake_target',
         sql='target_table_creation.sql',
     )
 
