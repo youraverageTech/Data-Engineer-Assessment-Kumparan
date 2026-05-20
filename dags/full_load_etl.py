@@ -100,8 +100,8 @@ def load_dim_authors():
     logger.info("Tabel dwh.dim_authors berhasil di-truncate.")
 
     sf_hook.run("""
-        INSERT INTO dwh.dim_authors (authors_id, name, email, created_at, updated_at)
-        SELECT id as authors_id
+        INSERT INTO dwh.dim_authors (author_id, name, email, created_at, updated_at)
+        SELECT id as author_id
                 , name
                 , email
                 , created_at
@@ -119,8 +119,8 @@ def load_dim_articles():
     logger.info("Tabel dwh.dim_articles berhasil di-truncate.")
 
     sf_hook.run("""
-        INSERT INTO dwh.dim_articles (articles_id, title, content, published_at, created_at, updated_at, deleted_at)
-        SELECT id as articles_id
+        INSERT INTO dwh.dim_articles (article_id, title, content, published_at, created_at, updated_at, deleted_at)
+        SELECT id as article_id
                 , title
                 , content
                 , published_at
@@ -140,19 +140,19 @@ def load_fact_report_articles():
     logger.info("Tabel dwh.fact_reports_articles berhasil di-truncate.")
 
     sf_hook.run("""
-        INSERT INTO dwh.fact_reports_articles (article_id, author_id, published_date_at, article_count)
+        INSERT INTO dwh.fact_reports_articles (article_id, author_id, published_date_at, article_count, created_at, updated_at)
         SELECT 
                 a.id as article_id
-                , au.authors_id
+                , au.author_id
                 , TO_NUMBER(TO_CHAR(a.published_at, 'YYYYMMDD')) as published_date_at
                 , COUNT(a.id) as article_count
                 , MAX(a.created_at) as created_at
                 , MAX(a.updated_at) as updated_at
         from staging.articles a
         JOIN dwh.dim_authors au
-        ON a.author_id = au.authors_id
-        WHERE a.published_at IS NOT NULL
-        GROUP BY a.id, au.authors_id, a.published_at;
+        ON a.author_id = au.author_id
+        WHERE a.published_at IS NOT NULL and a.deleted_at IS NULL
+        GROUP BY a.id, au.author_id, a.published_at;
     """)
     count_fact_articles = sf_hook.get_first("select count(*) from dwh.fact_reports_articles")[0]
     logger.info(f"Jumlah data yang berhasil disimpan di dwh.fact_reports_articles: {count_fact_articles} rows")
