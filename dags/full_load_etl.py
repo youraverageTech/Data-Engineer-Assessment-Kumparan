@@ -92,21 +92,13 @@ def load_data_to_staging():
     else:
         raise FileNotFoundError("File CSV tidak ditemukan di path yang ditentukan.")
 
-## Transformasi data dan load ke Snowflake target tables
-def merge_data_to_target():
-    logger.info("Memulai proses transformasi dan load data ke Snowflake target tables...")
-    ### membuat koneksi hook ke Snowflake
+## Load dim_authors ke Snowflake target tables
+def load_dim_authors():
+    logger.info("Memulai proses load data ke Snowflake dwh.dim_authors...")
     sf_hook = SnowflakeHook(snowflake_conn_id="snowflake_target")
-
-    ### Melakukan truncate pada target tables sebelum melakukan merge data
     sf_hook.run("TRUNCATE TABLE dwh.dim_authors")
-    sf_hook.run("TRUNCATE TABLE dwh.dim_articles")
-    sf_hook.run("TRUNCATE TABLE dwh.fact_reports_articles")
-    logger.info("Target tables (dim_authors, dim_articles, fact_reports_articles) berhasil di-truncate.")
+    logger.info("Tabel dwh.dim_authors berhasil di-truncate.")
 
-    ### melakukan merge data dari staging tables ke target tables
-    #### melakukan merge data dari staging_authors ke dim_authors
-    logger.info("Memasukkan data dari staging ke dwh.dim_authors...")
     sf_hook.run("""
         INSERT INTO dwh.dim_authors (authors_id, name, email, created_at, updated_at)
         SELECT id as authors_id
@@ -119,8 +111,13 @@ def merge_data_to_target():
     count_dim_authors = sf_hook.get_first("select count(*) from dwh.dim_authors")[0]
     logger.info(f"Jumlah data yang berhasil disimpan di dwh.dim_authors: {count_dim_authors} rows")
 
-    #### melakukan merge data dari staging_articles ke dim_articles
-    logger.info("Memasukkan data dari staging ke dwh.dim_articles...")
+## Load dim_articles ke Snowflake target tables
+def load_dim_articles():
+    logger.info("Memulai proses load data ke Snowflake dwh.dim_articles...")
+    sf_hook = SnowflakeHook(snowflake_conn_id="snowflake_target")
+    sf_hook.run("TRUNCATE TABLE dwh.dim_articles")
+    logger.info("Tabel dwh.dim_articles berhasil di-truncate.")
+
     sf_hook.run("""
         INSERT INTO dwh.dim_articles (articles_id, title, content, published_at, created_at, updated_at, deleted_at)
         SELECT id as articles_id
@@ -135,8 +132,13 @@ def merge_data_to_target():
     count_dim_articles = sf_hook.get_first("select count(*) from dwh.dim_articles")[0]
     logger.info(f"Jumlah data yang berhasil disimpan di dwh.dim_articles: {count_dim_articles} rows")
 
-    #### melakukan merge data ke fact_reports_articles
-    logger.info("Memasukkan data ke dwh.fact_reports_articles...")
+## Load fact_reports_articles ke Snowflake target tables
+def load_fact_report_articles():
+    logger.info("Memulai proses load data ke Snowflake dwh.fact_reports_articles...")
+    sf_hook = SnowflakeHook(snowflake_conn_id="snowflake_target")
+    sf_hook.run("TRUNCATE TABLE dwh.fact_reports_articles")
+    logger.info("Tabel dwh.fact_reports_articles berhasil di-truncate.")
+
     sf_hook.run("""
         INSERT INTO dwh.fact_reports_articles (article_id, author_id, published_date_at, article_count)
         SELECT a.id as article_id
@@ -175,12 +177,27 @@ with DAG(
         execution_timeout = timedelta(minutes=3),
         dag=dag
     )
-    merge_target_task = PythonOperator(
-        task_id = 'merge_data_to_target',
-        python_callable = merge_data_to_target,
+
+    load_dim_authors_task = PythonOperator(
+        task_id = 'load_dim_authors',
+        python_callable = load_dim_authors,
+        execution_timeout = timedelta(minutes=3),
+        dag=dag
+    )
+
+    load_dim_articles_task = PythonOperator(
+        task_id = 'load_dim_articles',
+        python_callable = load_dim_articles,
+        execution_timeout = timedelta(minutes=3),
+        dag=dag
+    )
+
+    load_fact_report_articles_task = PythonOperator(
+        task_id = 'load_fact_report_articles',
+        python_callable = load_fact_report_articles,
         execution_timeout = timedelta(minutes=3),
         dag=dag
     )
 
     ### Menentukan urutan eksekusi task
-    extract_task >> load_staging_task >> merge_target_task
+    extract_task >> load_staging_task >> [load_dim_authors_task, load_dim_articles_task] >> load_fact_report_articles_task
