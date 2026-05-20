@@ -27,14 +27,17 @@ CREATE TABLE articles (
 );
 
 -- Membuat Index untuk kebutuhan percepatan Incremental Load
+DROP INDEX IF EXISTS idx_articles_published_at;
+DROP INDEX IF EXISTS idx_articles_updated_at;
+DROP INDEX IF EXISTS idx_authors_updated_at;
 CREATE INDEX idx_articles_published_at ON articles(published_at);
 CREATE INDEX idx_articles_updated_at ON articles(updated_at);
-CREATE INDEX idx_articles_deleted_at ON articles(deleted_at);
 
 CREATE INDEX idx_authors_updated_at ON authors(updated_at);
 
 -- Membuat Function auto update updated_at pada table articles
-CREATE OR REPLACE FUNCTION updateArticles_updated_at_column()
+DROP FUNCTION IF EXISTS updateArticles_updated_at_column;
+CREATE FUNCTION updateArticles_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
@@ -43,7 +46,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Membuat Function auto update updated_at pada table authors
-CREATE OR REPLACE FUNCTION updateAuthors_updated_at_column()
+DROP FUNCTION IF EXISTS updateAuthors_updated_at_column;
+CREATE FUNCTION updateAuthors_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
@@ -52,12 +56,14 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Membuat Trigger untuk auto update updated_at pada table articles
+DROP TRIGGER IF EXISTS trigger_update_updated_at ON articles;
 CREATE TRIGGER trigger_update_updated_at
 BEFORE UPDATE ON articles
 FOR EACH ROW
 EXECUTE FUNCTION updateArticles_updated_at_column();
 
 -- Membuat Trigger untuk auto update updated_at pada table authors
+DROP TRIGGER IF EXISTS trigger_update_authors_updated_at ON authors;
 CREATE TRIGGER trigger_update_authors_updated_at
 BEFORE UPDATE ON authors
 FOR EACH ROW

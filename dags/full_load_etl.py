@@ -36,14 +36,14 @@ def extract_data():
     author_data = "Select * from authors"
     df_authors = pg_hook.get_pandas_df(author_data)
     author_path_file = "/tmp/authors.csv"
-    df_authors.to_csv(author_path_file, index=False)
+    df_authors.to_csv(author_path_file, index=False, sep='|')
     logger.info(f"Berhasil mengekstrak data dari tabel authors. Total baris: {len(df_authors)}")
 
     ### query untuk mengambil data dari tabel articles dan menyimpannya ke dalam file CSV
     articles_data = "Select * from articles"
     df_articles = pg_hook.get_pandas_df(articles_data)
     articles_path_file = "/tmp/articles.csv"
-    df_articles.to_csv(articles_path_file, index=False)
+    df_articles.to_csv(articles_path_file, index=False, sep='|')
     logger.info(f"Berhasil mengekstrak data dari tabel articles. Total baris: {len(df_articles)}")
 
 ## Load data ke Snowflake staging tables
@@ -66,7 +66,7 @@ def load_data_to_staging():
         sf_hook.run("""
             COPY INTO staging.authors
             FROM @~/authors.csv
-            FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1)
+            FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = '|' SKIP_HEADER = 1)
             PURGE = TRUE;
         """)
 
@@ -84,7 +84,7 @@ def load_data_to_staging():
         sf_hook.run("""
             COPY INTO staging.articles
             FROM @~/articles.csv
-            FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1)
+            FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = '|' SKIP_HEADER = 1)
             PURGE = TRUE;
         """)
         count_articles = sf_hook.get_first("select count(*) from staging.articles")[0]

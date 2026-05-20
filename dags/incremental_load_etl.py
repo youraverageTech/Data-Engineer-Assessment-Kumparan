@@ -44,14 +44,14 @@ def extract_incremental_data(**context):
     author_query = "SELECT * FROM authors WHERE updated_at >= %s"
     df_authors = pg_hook.get_pandas_df(author_query, parameters=(last_load_time,))
     author_path_file = "/tmp/incremental_authors.csv"
-    df_authors.to_csv(author_path_file, index=False)
+    df_authors.to_csv(author_path_file, index=False, sep='|')
     logger.info(f"Berhasil mengekstrak {len(df_authors)} data baru/diperbarui dari tabel authors.")
 
     ### Ekstraksi articles
     articles_query = "SELECT * FROM articles WHERE updated_at >= %s"
     df_articles = pg_hook.get_pandas_df(articles_query, parameters=(last_load_time,))
     articles_path_file = "/tmp/incremental_articles.csv"
-    df_articles.to_csv(articles_path_file, index=False)
+    df_articles.to_csv(articles_path_file, index=False, sep='|')
     logger.info(f"Berhasil mengekstrak {len(df_articles)} data baru/diperbarui dari tabel articles.")
 
 ## 2. Load data incremental ke Snowflake staging tables
@@ -73,7 +73,7 @@ def load_incremental_to_staging():
             sf_hook.run("""
                 COPY INTO staging.authors
                 FROM @~/incremental_authors.csv
-                FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1)
+                FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = '|' SKIP_HEADER = 1)
                 PURGE = TRUE;
             """)
             count_authors = sf_hook.get_first("select count(*) from staging.authors")[0]
@@ -92,7 +92,7 @@ def load_incremental_to_staging():
             sf_hook.run("""
                 COPY INTO staging.articles
                 FROM @~/incremental_articles.csv
-                FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1)
+                FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = '|' SKIP_HEADER = 1)
                 PURGE = TRUE;
             """)
             count_articles = sf_hook.get_first("select count(*) from staging.articles")[0]
@@ -176,8 +176,8 @@ def merge_fact_report_articles():
                  , au.authors_id as author_id
                  , a.published_at
                  , a.deleted_at
-            FROM staging.articles a
-            LEFT JOIN dwh.dim_authors au ON a.author_id = au.authors_id
+            FROM dwh.dim_authors au
+            LEFT JOIN staging.articles a ON a.author_id = au.authors_id
         ) source
         ON target.article_id = source.article_id
         WHEN MATCHED AND (source.published_at IS NULL OR source.deleted_at IS NOT NULL) THEN
@@ -197,7 +197,7 @@ with DAG(
     "incremental_load_etl",
     default_args=default_args,
     description="DAG untuk melakukan incremental load data dari PostgreSQL ke Snowflake",
-    schedule=None, # Dijalankan manual atau terjadwal (misal: daily)
+    schedule="@hourly", # Dijalankan manual atau terjadwal (misal: daily)
     catchup=False,
     tags=["incremental_load", "postgresql", "snowflake"]
 ) as dag:

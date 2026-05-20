@@ -14,7 +14,7 @@ default_args = {
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,
-    'retry_delay': timedelta(minutes=5),
+    'retry_delay': timedelta(minutes=1),
 }
 
 with DAG(
@@ -49,5 +49,12 @@ with DAG(
         sql='target_table_creation.sql',
     )
 
+    # Task untuk menjalankan dim_date_table_creation.sql pada Snowflake
+    setup_dim_date = SQLExecuteQueryOperator(
+        task_id='setup_dim_date_snowflake',
+        conn_id='snowflake_target',
+        sql='dim_date_table_creation.sql',
+    )
+
     # Menentukan urutan eksekusi: Source dulu, kemudian Seed Source, baru Target
-    setup_source >> seed_source >> setup_target
+    setup_source >> seed_source >> setup_target >> setup_dim_date
