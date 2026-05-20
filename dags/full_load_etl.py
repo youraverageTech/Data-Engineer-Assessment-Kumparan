@@ -26,7 +26,7 @@ default_args = {
 
 # Membuat Alur ETL/ELT
 
-## Ekstraksi Data dari database source PostgreSQL
+## 1. Ekstraksi Data dari database source PostgreSQL
 def extract_data():
     logger.info("Memulai proses ekstraksi data dari PostgreSQL...")
     ### membuat koneksi hook ke database PostgreSQL
@@ -46,7 +46,7 @@ def extract_data():
     df_articles.to_csv(articles_path_file, index=False, sep='|')
     logger.info(f"Berhasil mengekstrak data dari tabel articles. Total baris: {len(df_articles)}")
 
-## Load data ke Snowflake staging tables
+## 2. Load data ke Snowflake staging tables
 def load_data_to_staging():
     logger.info("Memulai proses memuat data ke Snowflake staging tables...")
     ### membuat koneksi hook ke Snowflake
@@ -92,7 +92,7 @@ def load_data_to_staging():
     else:
         raise FileNotFoundError("File CSV tidak ditemukan di path yang ditentukan.")
 
-## Load dim_authors ke Snowflake target tables
+## 3. Load dim_authors ke Snowflake target tables
 def load_dim_authors():
     logger.info("Memulai proses load data ke Snowflake dwh.dim_authors...")
     sf_hook = SnowflakeHook(snowflake_conn_id="snowflake_target")
@@ -111,7 +111,7 @@ def load_dim_authors():
     count_dim_authors = sf_hook.get_first("select count(*) from dwh.dim_authors")[0]
     logger.info(f"Jumlah data yang berhasil disimpan di dwh.dim_authors: {count_dim_authors} rows")
 
-## Load dim_articles ke Snowflake target tables
+## 4. Load dim_articles ke Snowflake target tables
 def load_dim_articles():
     logger.info("Memulai proses load data ke Snowflake dwh.dim_articles...")
     sf_hook = SnowflakeHook(snowflake_conn_id="snowflake_target")
@@ -132,7 +132,7 @@ def load_dim_articles():
     count_dim_articles = sf_hook.get_first("select count(*) from dwh.dim_articles")[0]
     logger.info(f"Jumlah data yang berhasil disimpan di dwh.dim_articles: {count_dim_articles} rows")
 
-## Load fact_reports_articles ke Snowflake target tables
+## 5. Load fact_reports_articles ke Snowflake target tables
 def load_fact_report_articles():
     logger.info("Memulai proses load data ke Snowflake dwh.fact_reports_articles...")
     sf_hook = SnowflakeHook(snowflake_conn_id="snowflake_target")
@@ -141,10 +141,13 @@ def load_fact_report_articles():
 
     sf_hook.run("""
         INSERT INTO dwh.fact_reports_articles (article_id, author_id, published_date_at, article_count)
-        SELECT a.id as article_id
+        SELECT 
+                a.id as article_id
                 , au.authors_id
                 , TO_NUMBER(TO_CHAR(a.published_at, 'YYYYMMDD')) as published_date_at
-                , count(a.id) as article_count
+                , COUNT(a.id) as article_count
+                , MAX(a.created_at) as created_at
+                , MAX(a.updated_at) as updated_at
         from staging.articles a
         JOIN dwh.dim_authors au
         ON a.author_id = au.authors_id

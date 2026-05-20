@@ -116,14 +116,14 @@ def merge_dim_authors():
     sf_hook.run("""
         MERGE INTO dwh.dim_authors target
         USING staging.authors source
-        ON target.authors_id = source.id
+        ON target.author_id = source.id
         WHEN MATCHED THEN
             UPDATE SET target.name = source.name,
                        target.email = source.email,
                        target.created_at = source.created_at,
                        target.updated_at = source.updated_at
         WHEN NOT MATCHED THEN
-            INSERT (authors_id, name, email, created_at, updated_at)
+            INSERT (author_id, name, email, created_at, updated_at)
             VALUES (source.id, source.name, source.email, source.created_at, source.updated_at);
     """)
     logger.info("Proses MERGE ke dwh.dim_authors selesai.")
@@ -142,7 +142,7 @@ def merge_dim_articles():
     sf_hook.run("""
         MERGE INTO dwh.dim_articles target
         USING staging.articles source
-        ON target.articles_id = source.id
+        ON target.article_id = source.id
         WHEN MATCHED THEN
             UPDATE SET target.title = source.title,
                        target.content = source.content,
@@ -151,7 +151,7 @@ def merge_dim_articles():
                        target.updated_at = source.updated_at,
                        target.deleted_at = source.deleted_at
         WHEN NOT MATCHED THEN
-            INSERT (articles_id, title, content, published_at, created_at, updated_at, deleted_at)
+            INSERT (article_id, title, content, published_at, created_at, updated_at, deleted_at)
             VALUES (source.id, source.title, source.content, source.published_at, source.created_at, source.updated_at, source.deleted_at);
     """)
     logger.info("Proses MERGE ke dwh.dim_articles selesai.")
@@ -173,11 +173,15 @@ def merge_fact_report_articles():
         MERGE INTO dwh.fact_reports_articles target
         USING (
             SELECT a.id as article_id
-                 , au.authors_id as author_id
+                 , au.author_id as author_id
                  , a.published_at
-                 , a.deleted_at
-            FROM dwh.dim_authors au
-            LEFT JOIN staging.articles a ON a.author_id = au.authors_id
+                 , COUNT(*) as article_count
+                 , MAX(a.deleted_at) as deleted_at
+                 , MAX(a.created_at) as created_at
+                 , MAX(a.updated_at) as updated_at
+            FROM staging.articles a
+            LEFT JOIN dwh.dim_authors au ON a.author_id = au.author_id
+            GROUP BY a.id, au.author_id, a.published_at
         ) source
         ON target.article_id = source.article_id
         WHEN MATCHED AND (source.published_at IS NULL OR source.deleted_at IS NOT NULL) THEN
@@ -185,10 +189,12 @@ def merge_fact_report_articles():
         WHEN MATCHED AND source.published_at IS NOT NULL AND source.deleted_at IS NULL THEN
             UPDATE SET target.author_id = source.author_id,
                        target.published_date_at = TO_NUMBER(TO_CHAR(source.published_at, 'YYYYMMDD')),
-                       target.article_count = 1
+                       target.article_count = source.article_count
+                       target.created_at = source.created_at,
+                       target.updated_at = source.updated_at
         WHEN NOT MATCHED AND source.published_at IS NOT NULL AND source.deleted_at IS NULL THEN
-            INSERT (article_id, author_id, published_date_at, article_count)
-            VALUES (source.article_id, source.author_id, TO_NUMBER(TO_CHAR(source.published_at, 'YYYYMMDD')), 1);
+            INSERT (article_id, author_id, published_date_at, article_count, created_at, updated_at)
+            VALUES (source.article_id, source.author_id, TO_NUMBER(TO_CHAR(source.published_at, 'YYYYMMDD')), source.article_count, source.created_at, source.updated_at);
     """)
     logger.info("Proses MERGE ke dwh.fact_reports_articles selesai.")
 

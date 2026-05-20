@@ -24,6 +24,7 @@ Data_Engineer_Assessment-Kumparan/
 ├── include/
 │   ├── source_table_creation.sql    # DDL tabel source PostgreSQL
 │   ├── target_table_creation.sql    # DDL tabel target Snowflake
+│   ├── dim_date_table_creation.sql  # DDL tabel dim_date untuk DWH
 │   └── seed_data_source.sql         # Data dummy/seed untuk PostgreSQL
 ├── plugins/
 ├── tests/

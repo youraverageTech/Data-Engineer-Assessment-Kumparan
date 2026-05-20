@@ -26,7 +26,7 @@ CREATE OR REPLACE TABLE staging.articles (
 CREATE OR REPLACE SCHEMA dwh;
 -- table dim_authors
 CREATE OR REPLACE TABLE dwh.dim_authors (
-    authors_id VARCHAR NOT NULL,
+    author_id NUMBER NOT NULL,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     created_at TIMESTAMP,
@@ -35,7 +35,7 @@ CREATE OR REPLACE TABLE dwh.dim_authors (
 
 -- table dim_articles
 CREATE OR REPLACE TABLE dwh.dim_articles (
-    articles_id VARCHAR NOT NULL,
+    article_id NUMBER NOT NULL,
     title VARCHAR(255) NOT NULL,
     content TEXT,
     published_at TIMESTAMP,
@@ -59,5 +59,7 @@ CREATE OR REPLACE TABLE dwh.fact_reports_articles (
     article_id NUMBER,
     author_id NUMBER,
     published_date_at NUMBER,
-    article_count NUMBER DEFAULT 1
+    article_count NUMBER DEFAULT 1,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
 );
