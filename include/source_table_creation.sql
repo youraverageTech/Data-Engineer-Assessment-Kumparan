@@ -1,7 +1,8 @@
 -- Membuat table source untuk menyimpan data mentah yang akan dilakukan proses ETL/ELT
 
 -- table authors
-CREATE OR REPLACE TABLE authors (
+DROP TABLE IF EXISTS authors CASCADE;
+CREATE TABLE authors (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -10,7 +11,8 @@ CREATE OR REPLACE TABLE authors (
 );
 
 -- Table articles 
-CREATE OR REPLACE TABLE articles (
+DROP TABLE IF EXISTS articles CASCADE;
+CREATE TABLE articles (
     id BIGSERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     content TEXT,

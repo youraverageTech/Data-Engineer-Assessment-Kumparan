@@ -4,7 +4,7 @@
 CREATE OR REPLACE SCHEMA staging;
 -- table authors
 CREATE OR REPLACE TABLE staging.authors (
-    authors_id VARCHAR NOT NULL,
+    id VARCHAR NOT NULL,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     created_at TIMESTAMP,
@@ -12,7 +12,7 @@ CREATE OR REPLACE TABLE staging.authors (
 );
 -- Table articles
 CREATE OR REPLACE TABLE staging.articles (
-    articles_id VARCHAR NOT NULL,
+    id VARCHAR NOT NULL,
     title VARCHAR(255) NOT NULL,
     content TEXT,
     published_at TIMESTAMP,
@@ -26,7 +26,6 @@ CREATE OR REPLACE TABLE staging.articles (
 CREATE OR REPLACE SCHEMA dwh;
 -- table dim_authors
 CREATE OR REPLACE TABLE dwh.dim_authors (
-    authors_sk NUMBER AUTOINCREMENT,
     authors_id VARCHAR NOT NULL,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -36,7 +35,6 @@ CREATE OR REPLACE TABLE dwh.dim_authors (
 
 -- table dim_articles
 CREATE OR REPLACE TABLE dwh.dim_articles (
-    articles_sk NUMBER AUTOINCREMENT,
     articles_id VARCHAR NOT NULL,
     title VARCHAR(255) NOT NULL,
     content TEXT,
@@ -48,7 +46,7 @@ CREATE OR REPLACE TABLE dwh.dim_articles (
 
 -- table dim_date
 CREATE OR REPLACE TABLE dwh.dim_date (
-    date_sk NUMBER,
+    published_date_at NUMBER,
     date DATE,
     day INT,
     month INT,
@@ -58,8 +56,8 @@ CREATE OR REPLACE TABLE dwh.dim_date (
 
 -- table fact_reports_articles
 CREATE OR REPLACE TABLE dwh.fact_reports_articles (
-    article_sk NUMBER,
-    author_sk NUMBER,
-    published_date_sk NUMBER,
+    article_id NUMBER,
+    author_id NUMBER,
+    published_date_at NUMBER,
     article_count NUMBER DEFAULT 1
 );
