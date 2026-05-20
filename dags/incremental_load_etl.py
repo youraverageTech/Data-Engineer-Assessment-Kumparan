@@ -41,8 +41,8 @@ def extract_incremental_data(**context):
     pg_hook = PostgresHook(postgres_conn_id="postgres_source")
 
     ### Ekstraksi authors
-    author_query = "SELECT * FROM authors WHERE updated_at >= %s"
-    df_authors = pg_hook.get_pandas_df(author_query, parameters=(last_load_time,))
+    author_query = "SELECT * FROM authors"
+    df_authors = pg_hook.get_pandas_df(author_query)
     author_path_file = "/tmp/incremental_authors.csv"
     df_authors.to_csv(author_path_file, index=False, sep='|')
     logger.info(f"Berhasil mengekstrak {len(df_authors)} data baru/diperbarui dari tabel authors.")
