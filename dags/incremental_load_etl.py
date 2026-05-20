@@ -170,32 +170,30 @@ def merge_fact_report_articles():
     # Gunakan query MERGE yang dapat menangani insert baru, update data aktif,
     # serta menghapus (DELETE) artikel yang menjadi draft (published_at NULL) atau di-soft delete (deleted_at NOT NULL)
     sf_hook.run("""
-        MERGE INTO dwh.fact_reports_articles target
+        MERGE INTO dwh.fact_reports_articles AS target
         USING (
             SELECT a.id as article_id
-                 , au.author_id as author_id
-                 , a.published_at
-                 , COUNT(*) as article_count
-                 , MAX(a.deleted_at) as deleted_at
-                 , MAX(a.created_at) as created_at
-                 , MAX(a.updated_at) as updated_at
+                , au.author_id as author_id
+                , MAX(a.published_at) as published_at
+                , COUNT(*) as article_count
+                , MAX(a.deleted_at) as deleted_at
+                , MAX(a.created_at) as created_at
+                , MAX(a.updated_at) as updated_at
             FROM staging.articles a
             LEFT JOIN dwh.dim_authors au ON a.author_id = au.author_id
-            GROUP BY a.id, au.author_id, a.published_at
-        ) source
+            GROUP BY a.id, au.author_id
+        ) AS source
         ON target.article_id = source.article_id
         WHEN MATCHED AND (source.published_at IS NULL OR source.deleted_at IS NOT NULL) THEN
             DELETE
         WHEN MATCHED AND source.published_at IS NOT NULL AND source.deleted_at IS NULL THEN
             UPDATE SET target.author_id = source.author_id,
                        target.published_date_at = TO_NUMBER(TO_CHAR(source.published_at, 'YYYYMMDD')),
-                       target.article_count = source.article_count
-                       target.created_at = source.created_at,
+                       target.article_count = source.article_count,
                        target.updated_at = source.updated_at
         WHEN NOT MATCHED AND source.published_at IS NOT NULL AND source.deleted_at IS NULL THEN
             INSERT (article_id, author_id, published_date_at, article_count, created_at, updated_at)
-            VALUES (source.article_id, source.author_id, TO_NUMBER(TO_CHAR(source.published_at, 'YYYYMMDD')), source.article_count, source.created_at, source.updated_at);
-    """)
+            VALUES (source.article_id, source.author_id, TO_NUMBER(TO_CHAR(source.published_at, 'YYYYMMDD')), source.article_count, source.created_at, source.updated_at);""")
     logger.info("Proses MERGE ke dwh.fact_reports_articles selesai.")
 
 # Membuat DAG Incremental
@@ -205,6 +203,7 @@ with DAG(
     description="DAG untuk melakukan incremental load data dari PostgreSQL ke Snowflake",
     schedule="@hourly", # Dijalankan manual atau terjadwal (misal: daily)
     catchup=False,
+    max_active_runs=1,
     tags=["incremental_load", "postgresql", "snowflake"]
 ) as dag:
 
